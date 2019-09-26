@@ -11,9 +11,9 @@ class App extends Component {
     async componentWillMount() {
         await this.loadWeb3();
         await this.loadBlockchainData();
-        this.checkBlockNumber()
-    }
 
+    }
+    //loading Web3
     async loadWeb3() {
         if(window.ethereum) {
             window.web3 = new Web3(window.ethereum);
@@ -22,7 +22,9 @@ class App extends Component {
             alert("Cannoct connect to network")
         }
     }
+    //loading loadBlockchainData
     async loadBlockchainData() {
+            this.setState({loading: true})
         let account = await window.web3.eth.getAccounts();
         this.setState({account: account[0]});
         const networkId = await window.web3.eth.net.getId();
@@ -31,11 +33,17 @@ class App extends Component {
             const voting = await window.web3.eth.Contract(Voting.abi, networkData.address)
             this.setState({voting});
             this.loadCandidates()
+            const deployer = await voting.methods.mainPerson().call()
+
+            this.setState({
+                deployer: deployer
+            })
+    this.setState({loading: false})
         } else {
             alert("Cannoct find network")
         }
     }
-
+    //loadingCandidates
     async loadCandidates() {
         this.setState({candidates: []})
         const candidatesCount = await this.state.voting.methods.candidatesCount().call()
@@ -46,43 +54,78 @@ class App extends Component {
         }
 
     }
-
+    //Add candidates function
     async addCandidate(name) {
         await this.state.voting.methods.addCandidate(name).send({from: this.state.account}, async(e) => {
             await this.checkBlockNumber();
         });
+
     }
 
+    //Give ability to votes
+    async givePermision(address) {
+        await this.state.voting.methods.whoCanVote(address).send({from: this.state.account}, async(e) => {
+            await this.checkBlockNumber();
+        })
+    }
+
+
+
+    //special function that check if transation that had been done is already mined
     async checkBlockNumber() {
         const sleep = (milliseconds) => {
             return new Promise(resolve => setTimeout(resolve, milliseconds))
         };
+        this.setState({loading: true})
         const blockNumber = await window.web3.eth.getBlockNumber()
-        const blockNumberNew = await window.web3.eth.getBlockNumber()
+        let blockNumberNew = await window.web3.eth.getBlockNumber()
         while(blockNumber === blockNumberNew) {
+            blockNumberNew = await window.web3.eth.getBlockNumber()
             await sleep(500);
         }
         this.loadCandidates();
+        this.setState({loading: false})
     }
-
+    isAccountDeployer() {
+        if(this.state.account === this.state.deployer) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    async addVote(id) {
+        await this.state.voting.methods.addVote(id).send({from: this.state.account}, async(e) => {
+            await this.checkBlockNumber();
+        })
+    }
 
     constructor(props) {
         super(props);
         this.state = {
             candidates: [],
-            account: ''
+            account: '',
+            deployer: '',
+            loading: true
         }
     }
 
-  render() {
-    return (
-      <div>
-      <Navbar account={this.state.account} />
-      <AddCandidate onSubmit={this.addCandidate.bind(this)} />
-      <CandidatesList candidates={this.state.candidates}/>
-      </div>
-    );
-  }
+    render() {
+        return (
+            <div>
+                <Navbar account={this.state.account} />
+
+                {this.state.loading
+                ? <h1 className="text-center font-weight-bolder mt-5 display-3 text-white">Loading...</h1>
+                : <div>{this.isAccountDeployer()
+                ?    <AddCandidate onSubmitOne={this.addCandidate.bind(this)} onSubmitTwo={this.givePermision.bind(this)} />
+                :    <div><h1 className="text-center mt-3 text-white">You are able only to vote</h1></div>
+                }
+                <CandidatesList addVote={this.addVote.bind(this)}  candidates={this.state.candidates}/>
+                </div>
+            }
+            </div>
+        );
+    }
 }
 
 export default App;

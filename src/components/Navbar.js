@@ -1,7 +1,7 @@
 import React from 'react'
-
+    //Navbar with account address
     function Navbar({account}) {
-        
+
             return(
                 <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
                 <div className="container d-flex align-items-center">
